@@ -149,7 +149,7 @@
     setInterval(() => {
       currentIndex = (currentIndex + 1) % photoUrls.length;
       document.getElementById('photo').src = photoUrls[currentIndex];
-    }, 2000);
+    }, 5000);
   }
 
   async function getPhotosFromAlbum(albumId, token) {
