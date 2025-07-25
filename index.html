@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Facebook Album Screensaver</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: black;
+      overflow: hidden;
+      height: 100%;
+      color: white;
+      font-family: sans-serif;
+    }
+
+    #photo {
+      width: 100vw;
+      height: 100vh;
+      object-fit: contain;
+      display: none;
+      background-color: black;
+    }
+
+    #login-btn, #album-selector {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 20px 40px;
+      font-size: 18px;
+      cursor: pointer;
+      background: #4267B2;
+      color: white;
+      border: none;
+      border-radius: 5px;
+    }
+
+    #album-selector {
+      top: auto;
+      bottom: 20%;
+    }
+
+    select {
+      font-size: 16px;
+      padding: 10px;
+      margin-top: 10px;
+    }
+
+    #album-menu {
+      text-align: center;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<button id="login-btn" onclick="login()">Login with Facebook</button>
+
+<div id="album-menu">
+  <h2>Select an Album</h2>
+  <select id="album-selector"></select>
+  <br>
+  <button onclick="startSelectedAlbum()">Start Slideshow</button>
+</div>
+
+<img id="photo" alt="Slideshow Image" />
+
+<!-- Load Facebook SDK -->
+<script async defer crossorigin="anonymous"
+  src="https://connect.facebook.net/en_US/sdk.js"></script>
+
+<script>
+  const APP_ID = '1645425542805280'; // Replace with your Facebook App ID
+  let photoUrls = [];
+  let currentIndex = 0;
+  let accessToken = '';
+
+  window.fbAsyncInit = function () {
+    FB.init({
+      appId: APP_ID,
+      cookie: true,
+      xfbml: false,
+      version: 'v19.0'
+    });
+
+    FB.getLoginStatus(response => {
+      if (response.status === 'connected') {
+        accessToken = response.authResponse.accessToken;
+        document.getElementById('login-btn').style.display = 'none';
+        showAlbumSelector();
+      }
+    });
+  };
+
+  function login() {
+    FB.login(response => {
+      if (response.authResponse) {
+        accessToken = response.authResponse.accessToken;
+        document.getElementById('login-btn').style.display = 'none';
+        showAlbumSelector();
+      }
+    }, { scope: 'user_photos' });
+  }
+
+  async function showAlbumSelector() {
+    const selector = document.getElementById('album-selector');
+    selector.innerHTML = '';
+    const res = await fetch(`https://graph.facebook.com/me/albums?fields=id,name&access_token=${accessToken}`);
+    const data = await res.json();
+
+    if (data.data && data.data.length > 0) {
+      data.data.forEach(album => {
+        const opt = document.createElement('option');
+        opt.value = album.id;
+        opt.textContent = album.name;
+        selector.appendChild(opt);
+      });
+      document.getElementById('album-menu').style.display = 'block';
+    } else {
+      alert("No albums found.");
+    }
+  }
+
+  async function startSelectedAlbum() {
+    const albumId = document.getElementById('album-selector').value;
+    photoUrls = await getPhotosFromAlbum(albumId, accessToken);
+    if (photoUrls.length === 0) {
+      alert("No photos in selected album.");
+      return;
+    }
+
+    document.getElementById('album-menu').style.display = 'none';
+    document.getElementById('photo').style.display = 'block';
+    document.documentElement.requestFullscreen?.();
+
+    document.getElementById('photo').src = photoUrls[0];
+    setInterval(() => {
+      currentIndex = (currentIndex + 1) % photoUrls.length;
+      document.getElementById('photo').src = photoUrls[currentIndex];
+    }, 2000);
+  }
+
+  async function getPhotosFromAlbum(albumId, token) {
+    let photos = [];
+    let next = `https://graph.facebook.com/${albumId}/photos?fields=images&access_token=${token}`;
+
+    while (next) {
+      const res = await fetch(next);
+      const data = await res.json();
+      data.data.forEach(photo => {
+        if (photo.images && photo.images.length > 0) {
+          photos.push(photo.images[0].source);
+        }
+      });
+      next = data.paging?.next || null;
+    }
+
+    return photos;
+  }
+</script>
+</body>
+</html>
